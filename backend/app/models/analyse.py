@@ -43,7 +43,11 @@ class RecommendedTest(BaseModel):
     test_name: str
     test_class: str | None = None
     node_id: str
-    framework: Literal["pytest", "unittest"]
+    framework: Literal[
+        "pytest", "unittest", "jest", "vitest", "mocha", "junit", "testng",
+        "xunit", "nunit", "mstest", "rspec", "minitest", "phpunit",
+        "dart_test", "go_test", "exunit", "clojure_test", "pester",
+    ]
     priority: Literal["low", "medium", "high", "critical"]
     confidence: float = Field(ge=0, le=1)
     reasons: list[str]

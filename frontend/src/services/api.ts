@@ -36,7 +36,25 @@ export interface AnalysisResult {
     test_name: string;
     test_class: string | null;
     node_id: string;
-    framework: "pytest" | "unittest";
+    framework:
+      | "pytest"
+      | "unittest"
+      | "jest"
+      | "vitest"
+      | "mocha"
+      | "junit"
+      | "testng"
+      | "xunit"
+      | "nunit"
+      | "mstest"
+      | "rspec"
+      | "minitest"
+      | "phpunit"
+      | "dart_test"
+      | "go_test"
+      | "exunit"
+      | "clojure_test"
+      | "pester";
     priority: "low" | "medium" | "high" | "critical";
     confidence: number;
     reasons: string[];

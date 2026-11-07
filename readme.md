@@ -1,6 +1,6 @@
 # TestPilot
 
-TestPilot analyses a GitHub pull request, maps changed lines to Python symbols and modules, traces import relationships, discovers the repository's tests, and recommends the smallest safe test set.
+TestPilot analyses a GitHub pull request, maps changed lines to symbols and modules, traces explicit import relationships, discovers supported tests, and recommends the smallest safe test set. It supports Python, JavaScript/TypeScript, Java, Kotlin, C#/.NET, Ruby, PHP, Dart, Go, Elixir, Clojure, and PowerShell while retaining a safe full-suite fallback for other languages.
 
 When TestPilot cannot analyse a change confidently, it deliberately selects the full suite rather than silently skipping potentially relevant tests.
 
@@ -12,8 +12,18 @@ When TestPilot cannot analyse a change confidently, it deliberately selects the 
 - Safe download and extraction of the PR head revision
 - Unified-diff line parsing
 - Python function, async function, class and module-level impact analysis
-- Pytest and unittest.TestCase discovery
-- Exact executable test node IDs
+- JavaScript/TypeScript function, class, ES module and CommonJS analysis
+- Java and Kotlin method, class, package and import analysis
+- C# namespace, class, method and using-directive analysis
+- Ruby require/require_relative, class and method analysis
+- PHP namespace, use, class and method analysis
+- Dart package/relative import, class and function analysis
+- Go package, import, function, method and struct analysis
+- Elixir module, alias/import and function analysis
+- Clojure namespace, require, function and record analysis
+- PowerShell module import and function analysis
+- Pytest, unittest, Jest, Vitest, Mocha, JUnit, TestNG, xUnit, NUnit, MSTest, RSpec, Minitest, PHPUnit, Dart package:test, Go testing, ExUnit, clojure.test and Pester discovery
+- Stable test identifiers with framework metadata
 - Direct and transitive import dependency analysis
 - Multi-signal confidence scoring
 - Conservative full-suite fallback for unknown, configuration, deleted or unsupported changes
@@ -96,7 +106,7 @@ POST /api/analyse with:
       "pull_request_url": "https://github.com/owner/repository/pull/123"
     }
 
-The response includes PR metadata and risk score, every changed file and its affected symbols, targeted or conservative selection mode, test counts, and exact test node IDs with confidence and reasons.
+The response includes PR metadata and risk score, every changed file and its affected symbols, targeted or conservative selection mode, test counts, and stable test identifiers with framework, confidence and reasons.
 
 ## Command line
 
@@ -105,21 +115,24 @@ From backend:
     python -m app.cli https://github.com/owner/repository/pull/123
     python -m app.cli --node-ids https://github.com/owner/repository/pull/123
 
-The node-ID command is suitable for CI and Jenkins command construction:
+The identifier command is suitable for CI and Jenkins adapters. For Python repositories, the identifiers can be passed directly to pytest:
 
     python -m pytest $(python -m app.cli --node-ids "$PULL_REQUEST_URL")
+
+Non-Python identifiers are returned with framework metadata so an executor can translate them to the corresponding JavaScript, JVM, .NET, Ruby, PHP, Dart, Go, Elixir, Clojure, or PowerShell runner syntax.
 
 ## Selection approach
 
 1. Download the pull request's head revision.
 2. Parse GitHub patches into changed line numbers.
-3. Map lines to Python functions/classes and detect module-level edits.
-4. Discover pytest functions and unittest/pytest test classes.
-5. Build the repository import graph and calculate transitive dependants.
-6. Score test-name, class, symbol-reference, import and file-path relationships.
-7. Use the full suite whenever a patch is unavailable, parsing fails, files are deleted, configuration changes, unsupported executable code changes, or no reliable relationship is found.
+3. Select a language adapter from the changed file extension.
+4. Map lines to functions, methods and classes using the selected language adapter.
+5. Discover tests for the supported Python, JavaScript/TypeScript, JVM, .NET, Ruby, PHP, Dart, Go, Elixir, Clojure and PowerShell frameworks.
+6. Build the repository import graph and calculate transitive dependants.
+7. Score direct symbol calls, class use, imports, test changes and scoped semantic relationships.
+8. Use the full suite whenever a patch is unavailable, parsing fails, files are deleted, configuration changes, unsupported executable code changes, or no reliable relationship is found.
 
-This is currently a Python test selector. Changes to unsupported executable languages intentionally trigger the safe full-suite fallback.
+The supported language set is intentionally conservative. C, C++, Rust, Swift, Scala, and languages without an implemented explicit dependency/test adapter remain unsupported and trigger full-suite selection; they are never treated as safely targeted.
 
 ## Project structure
 
@@ -133,6 +146,7 @@ This is currently a Python test selector. Changes to unsupported executable lang
         github.py
         diff_parser.py
         code_analysis.py
+        language_support.py
         dependencies.py
         test_discovery.py
         test_matching.py

@@ -155,6 +155,83 @@ def test_changed_test_selects_only_overlapping_test():
     assert result[0]["confidence"] == 1.0
 
 
+def test_dart_test_calls_do_not_make_a_scoped_change_broad():
+    tests = [
+        _test(
+            "existing case",
+            file="test/extensions_test.dart",
+            test_class=None,
+            start=5,
+            end=9,
+        ),
+        _test(
+            "regression case",
+            file="test/extensions_test.dart",
+            test_class=None,
+            start=12,
+            end=20,
+        ),
+    ]
+    changed_test = _change(
+        path="test/extensions_test.dart",
+        functions=["group", "main", "test"],
+        classes=["method"],
+        changed_lines=[14, 15, 16],
+    )
+
+    result = match_tests([], [], tests, [changed_test])
+
+    assert [item["test_name"] for item in result] == ["regression case"]
+
+
+def test_duplicate_test_names_use_source_ranges_for_changed_test_matching():
+    tests = [
+        _test("cast", file="test/type_test.exs", start=10, end=20),
+        _test("cast", file="test/type_test.exs", start=30, end=40),
+    ]
+    changed_test = _change(
+        path="test/type_test.exs",
+        changed_lines=[35],
+    )
+
+    result = match_tests([], [], tests, [changed_test])
+
+    assert len(result) == 1
+    assert result[0]["test_name"] == "cast"
+
+
+def test_direct_call_through_dependent_barrel_module_is_selected():
+    tests = [
+        _test(
+            "uses slice",
+            file="test/extensions_test.dart",
+            test_class=None,
+            imports=["collection"],
+            calls=["slice"],
+        ),
+        _test(
+            "uses map",
+            file="test/extensions_test.dart",
+            test_class=None,
+            imports=["collection"],
+            calls=["map"],
+            start=7,
+            end=11,
+        ),
+    ]
+    change = _change(
+        path="lib/src/list_extensions.dart",
+        functions=["slice"],
+        classes=["ListExtensions"],
+        affected=["src/list_extensions", "collection"],
+    )
+
+    result = match_tests(["slice"], ["ListExtensions"], tests, [change])
+
+    assert [item["test_name"] for item in result] == ["uses slice"]
+    assert result[0]["confidence"] == 0.92
+
+
 def test_shared_test_fixture_change_selects_whole_file():
     tests = [
         _test("test_first", start=10, end=12),
@@ -197,3 +274,63 @@ def test_conservative_selection_returns_every_test():
 
 def test_handles_empty_inputs():
     assert match_tests([], [], []) == []
+
+
+
+def test_javascript_change_scoped_inside_one_test_does_not_select_siblings():
+    discovered = [
+        _test(
+            "first case",
+            file="tests/tasks.test.ts",
+            test_class=None,
+            start=5,
+            end=8,
+        ),
+        _test(
+            "regression case",
+            file="tests/tasks.test.ts",
+            test_class=None,
+            start=10,
+            end=16,
+        ),
+    ]
+    changed_test = _change(
+        path="tests/tasks.test.ts",
+        changed_lines=[12, 13],
+        module_level=True,
+    )
+
+    result = match_tests([], [], discovered, [changed_test])
+
+    assert [item["test_name"] for item in result] == ["regression case"]
+    assert result[0]["confidence"] == 1.0
+
+
+
+def test_go_changed_test_function_does_not_select_sibling_tests():
+    discovered = [
+        _test(
+            "TestLogin",
+            file="auth_test.go",
+            test_class=None,
+            start=5,
+            end=8,
+        ),
+        _test(
+            "TestLogout",
+            file="auth_test.go",
+            test_class=None,
+            start=10,
+            end=13,
+        ),
+    ]
+    changed_test = _change(
+        path="auth_test.go",
+        functions=["TestLogin"],
+        changed_lines=[6],
+    )
+
+    result = match_tests([], [], discovered, [changed_test])
+
+    assert [item["test_name"] for item in result] == ["TestLogin"]
+    assert result[0]["confidence"] == 1.0

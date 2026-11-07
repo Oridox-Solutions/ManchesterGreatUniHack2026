@@ -13,7 +13,7 @@ def main() -> None:
     parser.add_argument(
         "--node-ids",
         action="store_true",
-        help="Print only executable pytest/unittest node IDs.",
+        help="Print only selected test identifiers for CI execution.",
     )
     args = parser.parse_args()
     result = asyncio.run(

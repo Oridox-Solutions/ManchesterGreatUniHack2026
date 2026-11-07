@@ -4,7 +4,8 @@ from pathlib import Path
 
 
 IGNORED_PARTS = {
-    ".git", ".venv", "venv", "node_modules", "dist", "build", "__pycache__"
+    ".git", ".venv", "venv", "node_modules", "dist", "build", "__pycache__",
+    ".bundle", ".gradle", "vendor", "bin", "obj", "target", "coverage",
 }
 
 
@@ -70,6 +71,8 @@ def find_reverse_dependencies(
                     dependency == candidate
                     or dependency.startswith(candidate + ".")
                     or candidate.startswith(dependency + ".")
+                    or dependency.startswith(candidate + "/")
+                    or candidate.startswith(dependency + "/")
                 ):
                     reverse[candidate].add(importer)
 

@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from app.services.language_support import is_test_path
+
 
 SENSITIVE_TERMS = {
     "auth", "security", "permission", "migration", "database", "schema",
@@ -60,12 +62,7 @@ def calculate_risk(
 
 
 def _is_test(path: str) -> bool:
-    file = Path(path)
-    return (
-        file.name.startswith("test_")
-        or file.name.endswith("_test.py")
-        or "tests" in file.parts
-    )
+    return is_test_path(path)
 
 
 def _is_documentation(path: str) -> bool:

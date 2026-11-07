@@ -1,6 +1,8 @@
 import re
 from pathlib import Path
 
+from app.services.language_support import is_test_path
+
 
 _GENERIC_FUNCTIONS = {
     "add", "create", "delete", "get", "handle", "list", "process",
@@ -49,7 +51,7 @@ def match_tests(
 
         test_impact = test_changes.get(test_path)
         if test_impact:
-            if test.get("node_id") in test_impact["direct_nodes"]:
+            if _test_impact_key(test) in test_impact["direct_nodes"]:
                 confidence = 1.0
                 reasons.append("Test implementation was changed in this pull request")
             elif test_impact["broad"]:
@@ -111,6 +113,13 @@ def match_tests(
                 affected_module = _matching_affected_module(
                     imports, change["affected_modules"], module
                 )
+                if affected_module and normalised in called_names:
+                    confidence = max(confidence, 0.92)
+                    reasons.append(
+                        f"Test calls changed symbol '{_symbol_label(change, function)}' "
+                        f"through dependent module '{affected_module}'"
+                    )
+                    continue
                 if affected_module and _semantic_name_match(
                     function, change["domains"], test_tokens
                 ):
@@ -236,29 +245,60 @@ def _changed_test_impacts(
             for test in tests
         )
 
-        direct_nodes: set[str] = set()
+        direct_nodes: set[tuple[str, int | None, int | None]] = set()
         if changed_lines and positions_available:
             for test in tests:
                 if any(
                     test["start_line"] <= line <= test["end_line"]
                     for line in changed_lines
                 ):
-                    direct_nodes.add(test.get("node_id") or _legacy_node_id(test))
+                    direct_nodes.add(_test_impact_key(test))
 
-        functions = set(file.get("changed_functions", []))
-        non_test_function_changed = any(
-            not function.startswith("test_") for function in functions
+        changed_lines_are_test_scoped = (
+            bool(changed_lines)
+            and positions_available
+            and all(
+                any(
+                    test["start_line"] <= line <= test["end_line"]
+                    for test in tests
+                )
+                for line in changed_lines
+            )
         )
-        class_only_change = bool(file.get("changed_classes")) and not direct_nodes
+        functions = set(file.get("changed_functions", []))
+        discovered_test_names = {
+            test.get("test_name") for test in tests
+        }
+        non_test_function_changed = any(
+            function not in discovered_test_names
+            and not function.startswith("test_")
+            for function in functions
+        ) and not changed_lines_are_test_scoped
+        class_only_change = (
+            bool(file.get("changed_classes"))
+            and not direct_nodes
+            and not changed_lines_are_test_scoped
+        )
         broad = (
             not positions_available
-            or bool(file.get("module_level_change"))
+            or (
+                bool(file.get("module_level_change"))
+                and not changed_lines_are_test_scoped
+            )
             or non_test_function_changed
             or class_only_change
         )
         impacts[path] = {"direct_nodes": direct_nodes, "broad": broad}
 
     return impacts
+
+
+def _test_impact_key(test: dict) -> tuple[str, int | None, int | None]:
+    return (
+        test.get("node_id") or _legacy_node_id(test),
+        test.get("start_line"),
+        test.get("end_line"),
+    )
 
 
 def _matches_class_context(
@@ -380,7 +420,13 @@ def _legacy_node_id(test: dict) -> str:
 
 
 def _import_matches_module(imported: str, module: str) -> bool:
-    return imported == module or imported.startswith(module + ".")
+    return (
+        imported == module
+        or imported.startswith(module + ".")
+        or module.startswith(imported + ".")
+        or imported.startswith(module + "/")
+        or module.startswith(imported + "/")
+    )
 
 
 def _module_for_path(path: str) -> str:
@@ -392,12 +438,7 @@ def _module_for_path(path: str) -> str:
 
 
 def _is_test_path(path: str) -> bool:
-    file = Path(path)
-    return (
-        file.name.startswith("test_")
-        or file.name.endswith("_test.py")
-        or "tests" in file.parts
-    )
+    return is_test_path(path)
 
 
 def _path(value: str) -> str:
