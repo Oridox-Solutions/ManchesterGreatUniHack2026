@@ -1,242 +1,147 @@
-# TestPilot – Setup Guide
+# TestPilot
 
-Instructions for cloning, installing dependencies and running TestPilot locally.
+TestPilot analyses a GitHub pull request, maps changed lines to Python symbols and modules, traces import relationships, discovers the repository's tests, and recommends the smallest safe test set.
 
-## Prerequisites
+When TestPilot cannot analyse a change confidently, it deliberately selects the full suite rather than silently skipping potentially relevant tests.
 
-Install:
+## What is implemented
 
-- [Git](https://git-scm.com/downloads)
-- [Python 3.12+](https://www.python.org/downloads/)
-- [Node.js LTS](https://nodejs.org/)
-- [VS Code](https://code.visualstudio.com/) (recommended)
+- Strict GitHub pull-request URL validation
+- GitHub metadata and paginated changed-file retrieval
+- Optional token support for private repositories and rate limits
+- Safe download and extraction of the PR head revision
+- Unified-diff line parsing
+- Python function, async function, class and module-level impact analysis
+- Pytest and unittest.TestCase discovery
+- Exact executable test node IDs
+- Direct and transitive import dependency analysis
+- Multi-signal confidence scoring
+- Conservative full-suite fallback for unknown, configuration, deleted or unsupported changes
+- Explainable risk scoring and recommendation reasons
+- Responsive React results dashboard
+- Backend tests and GitHub Actions CI
 
-Check installations:
+## Requirements
 
-```powershell
-git --version
-py --version
-node --version
-npm --version
-```
+- Python 3.12 or newer
+- Node.js 22 or newer
+- Git
 
----
+## Backend setup
 
-## 1. Clone the Repository
+From the repository root on Windows PowerShell:
 
-```powershell
-git clone YOUR_PUBLIC_REPOSITORY_URL
-cd ManchesterGreatUniHack2026
-```
+    cd backend
+    py -m venv .venv
+    .\.venv\Scripts\Activate.ps1
+    python -m pip install --upgrade pip
+    python -m pip install -r requirements.txt
+    python -m uvicorn app.main:app --reload
 
-## 2. Backend Setup
+On macOS or Linux:
 
-Run from the repository root:
+    cd backend
+    python3 -m venv .venv
+    source .venv/bin/activate
+    python -m pip install --upgrade pip
+    python -m pip install -r requirements.txt
+    python -m uvicorn app.main:app --reload
 
-```powershell
-cd backend
+The API is available at http://localhost:8000, with interactive documentation at http://localhost:8000/docs.
 
-py -m venv .venv
+## GitHub token
 
-.\.venv\Scripts\Activate.ps1
+Public repositories work without authentication, but GitHub applies a low anonymous rate limit. Copy .env.example or set the variables in the terminal before starting the backend.
 
-python -m pip install --upgrade pip
+PowerShell:
 
-python -m pip install -r requirements.txt
-```
+    $env:GITHUB_TOKEN="your_token_here"
 
-If PowerShell blocks activation:
+macOS or Linux:
 
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-```
+    export GITHUB_TOKEN="your_token_here"
 
-Then retry:
+The token needs repository read access for private repositories. Never commit it.
 
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
+## Frontend setup
 
-### Start Backend
+In a second terminal:
 
-From the `backend` directory:
+    cd frontend
+    npm ci
+    npm run dev
 
-```powershell
-python -m uvicorn app.main:app --reload
-```
+Open http://localhost:5173. Vite proxies /api and /health to the local backend. For a separately hosted API, set VITE_API_URL.
 
-Backend URLs:
+## Run tests and checks
 
-- API: http://localhost:8000
-- Health: http://localhost:8000/health
-- API documentation: http://localhost:8000/docs
+Backend:
 
-Keep this terminal open.
+    cd backend
+    python -m pytest -q
 
----
+Frontend:
 
-## 3. Frontend Setup
+    cd frontend
+    npm run lint
+    npm run build
 
-Open a **second terminal**.
+GitHub Actions runs all three checks on pushes and pull requests.
 
-From the repository root:
+## API
 
-```powershell
-cd frontend
+POST /api/analyse with:
 
-npm install
+    {
+      "pull_request_url": "https://github.com/owner/repository/pull/123"
+    }
 
-npm run dev
-```
+The response includes PR metadata and risk score, every changed file and its affected symbols, targeted or conservative selection mode, test counts, and exact test node IDs with confidence and reasons.
 
-Frontend URL:
-
-http://localhost:5173
-
-Keep this terminal open.
-
----
-
-## 4. Running the Application
-
-You need both terminals running simultaneously.
-
-| Service | Command | URL |
-|---|---|---|
-| Backend | `python -m uvicorn app.main:app --reload` | http://localhost:8000 |
-| Frontend | `npm run dev` | http://localhost:5173 |
-
-The backend terminal must have `.venv` activated.
-
-The frontend terminal must be inside the `frontend` directory.
-
----
-
-## 5. Testing the Application
-
-1. Open http://localhost:5173.
-2. Check that the backend status displays `healthy`.
-3. Enter the example PR URL:
-
-```text
-https://github.com/example/demo-project/pull/12
-```
-
-4. Click **Analyse PR**.
-
-The current endpoint returns mock analysis data.
-
----
-
-## 6. Useful Commands
-
-### Backend
-
-Activate the virtual environment (from `backend`):
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-Install a new Python dependency:
-
-```powershell
-python -m pip install PACKAGE_NAME
-```
-
-Update requirements after installing dependencies:
-
-```powershell
-python -m pip freeze > requirements.txt
-```
-
-Run backend tests:
-
-```powershell
-python -m pytest
-```
-
-Deactivate virtual environment:
-
-```powershell
-deactivate
-```
-
-### Frontend
-
-Install dependencies:
-
-```powershell
-npm install
-```
-
-Install a new package:
-
-```powershell
-npm install PACKAGE_NAME
-```
-
-Run development server:
-
-```powershell
-npm run dev
-```
-
-Build frontend:
-
-```powershell
-npm run build
-```
-
----
-
-## 7. Troubleshooting
-
-**PowerShell won't activate `.venv`:**
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-```
-
-**Backend says a Python module is missing:**
-
-Make sure `.venv` is activated, then run:
-
-```powershell
-python -m pip install -r requirements.txt
-```
-
-**Frontend says a package is missing:**
-
-From `frontend`:
-
-```powershell
-npm install
-```
-
-**Port 8000 or 5173 is already in use:**
-
-Close the other development server using that port before restarting.
-
-**Frontend cannot connect to backend:**
-
-Check that the backend is running at http://localhost:8000 and that `/health` returns a healthy status.
-
----
-
-## Project Structure
-
-```text
-ManchesterGreatUniHack2026/
-├── backend/
-│   ├── app/
-│   ├── tests/
-│   ├── requirements.txt
-│   └── .venv/
-├── frontend/
-│   ├── src/
-│   ├── public/
-│   └── package.json
-├── .gitignore
-└── README.md
-```
+## Command line
+
+From backend:
+
+    python -m app.cli https://github.com/owner/repository/pull/123
+    python -m app.cli --node-ids https://github.com/owner/repository/pull/123
+
+The node-ID command is suitable for CI and Jenkins command construction:
+
+    python -m pytest $(python -m app.cli --node-ids "$PULL_REQUEST_URL")
+
+## Selection approach
+
+1. Download the pull request's head revision.
+2. Parse GitHub patches into changed line numbers.
+3. Map lines to Python functions/classes and detect module-level edits.
+4. Discover pytest functions and unittest/pytest test classes.
+5. Build the repository import graph and calculate transitive dependants.
+6. Score test-name, class, symbol-reference, import and file-path relationships.
+7. Use the full suite whenever a patch is unavailable, parsing fails, files are deleted, configuration changes, unsupported executable code changes, or no reliable relationship is found.
+
+This is currently a Python test selector. Changes to unsupported executable languages intentionally trigger the safe full-suite fallback.
+
+## Project structure
+
+    backend/app/
+      main.py
+      cli.py
+      models/analyse.py
+      routes/analyse.py
+      services/
+        analysis.py
+        github.py
+        diff_parser.py
+        code_analysis.py
+        dependencies.py
+        test_discovery.py
+        test_matching.py
+        risk.py
+    frontend/src/
+      App.tsx
+      App.css
+      services/api.ts
+
+## Safety behaviour
+
+Test selection must prefer false positives over false negatives. A recommendation of zero tests is only allowed for documentation-only changes. All ambiguous executable changes use conservative mode and select every discovered test.

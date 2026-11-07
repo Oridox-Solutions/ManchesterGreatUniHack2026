@@ -2,12 +2,22 @@
 __pycache__/
 *.py[cod]
 .venv/
+venv/
 .pytest_cache/
+.coverage
+htmlcov/
 
 # Node
 node_modules/
 dist/
 
-# Environment variables
+# Environment variables and secrets
 .env
 .env.*
+!.env.example
+
+# Logs and editors
+*.log
+.vscode/
+.idea/
+.DS_Store
